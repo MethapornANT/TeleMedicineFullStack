@@ -1,0 +1,21 @@
+/* src/index.css */
+
+:root{
+  --page-top-pad: 88px; /* กำหนดระยะเว้นบน สำหรับ nav */
+  --bg-img: url('/bgbw.jpg');
+  --text-main: #0b1220;
+}
+
+/* reset / base */
+html,body,#root{ height:100%; margin:0; }
+body{
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+  color: var(--text-main);
+  background: var(--bg-img) center/cover no-repeat;
+  padding-top: var(--page-top-pad);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* make anchor default dark (minimal) */
+a { color: inherit; }
