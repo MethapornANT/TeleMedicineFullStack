@@ -25,21 +25,36 @@ import fs from "fs";
 import path from "path";
 import multer from "multer";
 import { fileURLToPath } from "url";
-
+import dotenv from 'dotenv';
+dotenv.config();
 
 ///////////////////////////////
 // 2) CONFIG / ENV
 ///////////////////////////////
+// (dotenv imported at top)
 const env = {
-  PORT: process.env.PORT || 4005,
+  NODE_ENV: process.env.NODE_ENV || "development",
+  PORT: Number(process.env.PORT || 4005),
   DB_HOST: process.env.DB_HOST || "localhost",
   DB_PORT: Number(process.env.DB_PORT || 3306),
   DB_USER: process.env.DB_USER || "root",
-  DB_PASSWORD: process.env.DB_PASSWORD || process.env.DB_PASS || "1234",
+  DB_PASSWORD: process.env.DB_PASS || process.env.DB_PASSWORD || "1234",
   DB_NAME: process.env.DB_NAME || "telemedicinedb",
-  JWT_SECRET: process.env.JWT_SECRET || "change-me-very-secret",
+  JWT_SECRET: process.env.JWT_SECRET || "",
   REDIS_URL: process.env.REDIS_URL || "",
+  ALLOW_ORIGINS: process.env.ALLOW_ORIGINS || ""
 };
+
+// Startup sanity checks (ป้องกัน run ใน production โดยใช้ค่า default ที่อันตราย)
+if (env.NODE_ENV === "production") {
+  const problems = [];
+  if (!process.env.DB_PASS && !process.env.DB_PASSWORD) problems.push("DB_PASS / DB_PASSWORD not set");
+  if (!process.env.JWT_SECRET) problems.push("JWT_SECRET not set");
+  if (problems.length) {
+    console.error("FATAL: missing required environment variables:", problems.join("; "));
+    process.exit(1); // better to fail loudly than run insecurely
+  }
+}
 
 ///////////////////////////////
 // 3) DB POOL
@@ -1700,7 +1715,7 @@ app.get(
     const upcoming = { count: Number(upRows[0]?.c || 0), next_date: upRows[0]?.next_date || null };
 
     res.json({
-      scope,              // "system" | "doctor"
+      scope,
       doctor_id: doctorId || null,
       window: date ? { type: "daily", date } : { type: "all" },
       total,
