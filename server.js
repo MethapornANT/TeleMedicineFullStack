@@ -35,7 +35,7 @@ const env = {
   DB_HOST: process.env.DB_HOST || "localhost",
   DB_PORT: Number(process.env.DB_PORT || 3306),
   DB_USER: process.env.DB_USER || "root",
-  DB_PASSWORD: process.env.DB_PASSWORD || "1234",
+  DB_PASSWORD: process.env.DB_PASSWORD || process.env.DB_PASS || "1234",
   DB_NAME: process.env.DB_NAME || "telemedicinedb",
   JWT_SECRET: process.env.JWT_SECRET || "change-me-very-secret",
   REDIS_URL: process.env.REDIS_URL || "",
@@ -58,7 +58,7 @@ const pool = mysql.createPool({
 // 4) EXPRESS APP + MIDDLEWARE
 ///////////////////////////////
 const app = express();
-app.set("trust proxy", false); // ปิดใน dev/ทดสอบ (ป้องกัน warning ของ express-rate-limit)
+app.set("trust proxy", process.env.NODE_ENV === "production" ? 1 : false);
 app.use(express.json());
 app.use(
   helmet({
@@ -69,9 +69,16 @@ app.use(
     crossOriginEmbedderPolicy: false,
   })
 );
-app.use(
-  cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE", "PATCH"] })
-);
+const allowOrigins = (process.env.ALLOW_ORIGINS || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin: allowOrigins.length ? allowOrigins : "*",
+  credentials: !!allowOrigins.length,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
+}));
 
 // global rate-limit (ทั้งหมด)
 app.use(
@@ -882,12 +889,10 @@ export async function listAppointmentsForUser(userId, role) {
   if (role === "patient") {
     const [rows] = await pool.query(
       `SELECT a.id, a.status, a.created_at,
-         DATE_FORMAT(a.chosen_date, '%Y-%m-%d') AS chosen_date,
-         COALESCE(CONCAT(a.chosen_date, ' 00:00:00'), ds.start_time) AS start_time,
-         COALESCE(CONCAT(a.chosen_date, ' 23:59:59'), ds.end_time)   AS end_time,
-              COALESCE(CONCAT(a.chosen_date, ' 00:00:00'), ds.start_time) AS start_time,
-              COALESCE(CONCAT(a.chosen_date, ' 23:59:59'), ds.end_time)   AS end_time,
-              d.id AS doctor_id, d.full_name AS doctor_name
+        DATE_FORMAT(a.chosen_date, '%Y-%m-%d') AS chosen_date,
+        COALESCE(CONCAT(a.chosen_date, ' 00:00:00'), ds.start_time) AS start_time,
+        COALESCE(CONCAT(a.chosen_date, ' 23:59:59'), ds.end_time)   AS end_time,
+        d.id AS doctor_id, d.full_name AS doctor_name
        FROM appointments a
        LEFT JOIN doctor_slots ds ON ds.id = a.slot_id
        JOIN users d ON d.id = a.doctor_id
@@ -1037,7 +1042,10 @@ const ReportQuery = z.object({
 const openapiSpec = {
   openapi: "3.0.3",
   info: { title: "Telemedicine API", version: "1.0.0" },
-  servers: [{ url: `http://localhost:${env.PORT}` }],
+  servers: [
+  { url: "/" },  // ใช้ origin ปัจจุบัน บนคลาวด์จะถูกเอง
+  { url: `http://localhost:${env.PORT}`, description: "local dev" }
+],
   components: {
     securitySchemes: {
       BearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" }
@@ -1302,6 +1310,7 @@ app.post(
 // ESCALATED LOGIN + IP BLOCK
 app.post(
   "/auth/login",
+  loginLimiter,
   asyncHandler(async (req, res) => {
     // 1) validate
     const parsed = LoginSchema.safeParse(req.body || {});
@@ -1732,6 +1741,6 @@ app.use((err, _req, res, _next) => {
 ///////////////////////////////
 // 12) START SERVER
 ///////////////////////////////
-app.listen(env.PORT, () => {
+app.listen(env.PORT, "0.0.0.0", () => {
   console.log("server started on port", env.PORT);
 });
