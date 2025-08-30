@@ -72,7 +72,7 @@ const pool = mysql.createPool({
 ///////////////////////////////
 // 4) EXPRESS APP + MIDDLEWARE
 ///////////////////////////////
-const app = express();
+export const app = express();
 app.set("trust proxy", process.env.NODE_ENV === "production" ? 1 : false);
 app.use(express.json());
 app.use(
@@ -1379,16 +1379,23 @@ app.post(
       return invalid();
     }
 
-    // ถ้าบัญชีถูกล็อกอยู่
+    // ถ้าบัญชีถูกล็อกอยู่ (รองรับทั้ง ISO และ MySQL DATETIME)
     if (user.locked_until) {
-      const untilTs = new Date(user.locked_until).getTime();
-      if (Date.now() < untilTs) {
+      const raw = String(user.locked_until);
+      let untilTs = Date.parse(raw); // ISO ได้แน่
+      if (Number.isNaN(untilTs)) {
+        // ลอง parse รูปแบบ "YYYY-MM-DD HH:mm:ss" เป็น local time
+        const guess = raw.includes(" ") ? raw.replace(" ", "T") : raw;
+        untilTs = Date.parse(guess);
+      }
+      if (!Number.isNaN(untilTs) && Date.now() < untilTs) {
         const leftMin = Math.ceil((untilTs - Date.now()) / 60000);
         return res.status(423).json({
           error: { code: "ACCOUNT_LOCKED", message: `บัญชีถูกล็อกชั่วคราว โปรดลองอีกครั้งใน ${leftMin} นาที` },
         });
       }
     }
+
 
     // ตรวจรหัสผ่าน
     const ok = verifyPassword(password, user.password_hash);
@@ -1816,6 +1823,8 @@ app.use((err, _req, res, _next) => {
 ///////////////////////////////
 // 12) START SERVER
 ///////////////////////////////
-app.listen(env.PORT, "0.0.0.0", () => {
-  console.log("server started on port", env.PORT);
-});
+if (process.env.NODE_ENV !== "test") {
+  app.listen(env.PORT, "0.0.0.0", () => {
+    console.log("server started on port", env.PORT);
+  });
+}

@@ -56,5 +56,10 @@ telemedicinedb_MethapornANT.sql
 5) ทดสอบได้ด้วย Postman
 telemedicine.postman_collection.json
 
+6) Test Unit ได้ด้วยคำสั่ง
+npm test
+หรือ
+npm run coverage
+
 #เข้าไปดูผลงานทันทีได้ที่
-Link Vercel: https://telemedicine-methapornant.vercel.app/login
+Link Vercel: https://telemedicine-methapornant-87b3rcgqa-pedza507s-projects.vercel.app/login
