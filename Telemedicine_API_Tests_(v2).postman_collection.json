@@ -1,0 +1,1566 @@
+{
+	"info": {
+		"_postman_id": "c51b3f4f-097e-42ac-b441-cbf52ded013e",
+		"name": "Telemedicine API Tests (v2)",
+		"description": "ชุดทดสอบ Postman สำหรับ Telemedicine Backend. แบ่ง 3 ชั้น: 1) ประเภทการทดสอบ 2) บทบาท (Doctor/Patient) 3) เคสย่อย (สำเร็จ/ข้อมูลไม่ครบ/ข้อมูลผิด)",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38428824"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Doctor",
+					"item": [
+						{
+							"name": "Register doctor (success)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('201 Created', ()=> pm.response.code===201);",
+											"const u = (pm.response.json().user||{}); if(u.id){pm.collectionVariables.set('doctorId', u.id);}"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"role\": \"doctor\",\n  \"full_name\": \"Dr. Sample\",\n  \"email\": \"{{doctorEmail}}\",\n  \"phone\": \"0890001111\",\n  \"password\": \"{{doctorPassword}}\",\n  \"specialties\": [\n    \"{{spec1}}\",\n    \"{{spec2}}\"\n  ]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								},
+								"description": "ควรเรียกหลังจากตั้งค่า {{spec1}},{{spec2}} จาก /specialties แล้ว"
+							},
+							"response": []
+						},
+						{
+							"name": "Register doctor (missing specialties) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"role\": \"doctor\",\n  \"full_name\": \"Dr. NoSpec\",\n  \"email\": \"nospec@example.com\",\n  \"password\": \"x1234\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Register doctor (invalid email) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"role\": \"doctor\",\n  \"full_name\": \"Dr. BadEmail\",\n  \"email\": \"bademail\",\n  \"password\": \"x1234\",\n  \"specialties\": [\n    \"{{spec1}}\"\n  ]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Login doctor (success)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"login ok\", function () {",
+											"  pm.response.to.have.status(200);",
+											"  const j = pm.response.json();",
+											"  pm.expect(j).to.have.property(\"token\");",
+											"  pm.expect(j.user).to.have.property(\"id\");",
+											"});",
+											"",
+											"const j = pm.response.json();",
+											"",
+											"// เซ็ตทั้ง Collection และ Environment ให้ตรงกัน",
+											"pm.collectionVariables.set(\"doctorToken\", String(j.token).trim());",
+											"pm.collectionVariables.set(\"doctorId\", String(j.user.id).trim());",
+											"",
+											"pm.environment.set(\"doctorToken\", String(j.token).trim());",
+											"pm.environment.set(\"doctorId\", String(j.user.id).trim());",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"{{doctorEmail}}\",\n  \"password\": \"{{doctorPassword}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Login doctor (wrong password) -> 401",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('401', ()=> pm.response.code===401);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"{{doctorEmail}}\",\n  \"password\": \"wrongpass\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Patient",
+					"item": [
+						{
+							"name": "Register patient (success)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('201 Created', ()=> pm.response.code===201);",
+											"const u = (pm.response.json().user||{}); if(u.id){pm.collectionVariables.set('patientId', u.id);}"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"role\": \"patient\",\n  \"full_name\": \"Patient One\",\n  \"email\": \"{{patientEmail}}\",\n  \"phone\": \"0812345678\",\n  \"password\": \"{{patientPassword}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Register patient (missing email) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"role\": \"patient\",\n  \"full_name\": \"No Email\",\n  \"password\": \"abcd\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Register patient (invalid email) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"role\": \"patient\",\n  \"full_name\": \"Bad Email\",\n  \"email\": \"bad\",\n  \"password\": \"abcd\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/register",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Login patient (success)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test(\"login ok\", function () {",
+											"  pm.response.to.have.status(200);",
+											"  const j = pm.response.json();",
+											"  pm.expect(j).to.have.property(\"token\");",
+											"  pm.expect(j.user).to.have.property(\"id\");",
+											"});",
+											"",
+											"const j = pm.response.json();",
+											"pm.collectionVariables.set(\"patientToken\", String(j.token).trim());",
+											"pm.collectionVariables.set(\"patientId\", String(j.user.id).trim());",
+											"pm.collectionVariables.set(\"patientEmail\", String(j.user.email || \"\"));",
+											"pm.collectionVariables.set(\"patientName\", String(j.user.full_name || \"\"));",
+											"",
+											"if (pm.response.code !== 200) {",
+											"  pm.collectionVariables.unset(\"patientToken\");",
+											"  pm.collectionVariables.unset(\"patientId\");",
+											"}",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"{{patientEmail}}\",\n  \"password\": \"{{patientPassword}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Login patient (wrong password) -> 401",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('401', ()=> pm.response.code===401);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"{{patientEmail}}\",\n  \"password\": \"wrongpass\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/auth/login",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Doctor",
+					"item": [
+						{
+							"name": "Me (doctor)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"me"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update my profile (doctor) - success",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"full_name\": \"Dr. Sample Updated\",\n  \"phone\": \"0891112222\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"me"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update my profile (doctor) - invalid phone -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"phone\": \"not-a-phone\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"me"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Patient",
+					"item": [
+						{
+							"name": "Me (patient)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{patientToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"me"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update my profile (patient) - success",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{patientToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"full_name\": \"Patient One Updated\",\n  \"phone\": \"0893334444\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"me"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update my profile (patient) - invalid phone -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{patientToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"phone\": \"abc\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/users/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"users",
+										"me"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Specialties",
+			"item": [
+				{
+					"name": "Get specialties + set {{spec1}}, {{spec2}}",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('200 OK', ()=> pm.response.code===200);",
+									"const data = pm.response.json().data || [];",
+									"if (data.length>0) pm.collectionVariables.set('spec1', data[0].id);",
+									"if (data.length>1) pm.collectionVariables.set('spec2', data[1].id);",
+									"console.log('spec1=', pm.collectionVariables.get('spec1'), 'spec2=', pm.collectionVariables.get('spec2'));"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/specialties",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"specialties"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Doctors",
+			"item": [
+				{
+					"name": "Patient",
+					"item": [
+						{
+							"name": "Search doctors (q)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/doctors?q=Doc",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"doctors"
+									],
+									"query": [
+										{
+											"key": "q",
+											"value": "Doc"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Search doctors (alias specialty by name)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/doctors?specialty=จักษุ",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"doctors"
+									],
+									"query": [
+										{
+											"key": "specialty",
+											"value": "จักษุ"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Search doctors (by specialty_id variable)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/doctors?specialty={{spec1}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"doctors"
+									],
+									"query": [
+										{
+											"key": "specialty",
+											"value": "{{spec1}}"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Slots",
+			"item": [
+				{
+					"name": "Doctor",
+					"item": [
+						{
+							"name": "Create slot (success, daily range)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('201', ()=> pm.response.code===201);",
+											"const s = pm.response.json().slot || {}; pm.collectionVariables.set('slotId', s.id || '');"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"start_time\": \"{{in3DaysYMD}}\",\n  \"end_time\": \"{{in7DaysYMD}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/doctors/{{doctorId}}/slots",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"doctors",
+										"{{doctorId}}",
+										"slots"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create slot (missing end_time) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"start_time\": \"{{in3DaysYMD}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/doctors/{{doctorId}}/slots",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"doctors",
+										"{{doctorId}}",
+										"slots"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create slot (invalid range) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"start_time\": \"{{in7DaysYMD}}\",\n  \"end_time\": \"{{in3DaysYMD}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/doctors/{{doctorId}}/slots",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"doctors",
+										"{{doctorId}}",
+										"slots"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "List my slots (window)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/doctors/{{doctorId}}/slots?from={{in3DaysYMD}}&to={{in7DaysYMD}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"doctors",
+										"{{doctorId}}",
+										"slots"
+									],
+									"query": [
+										{
+											"key": "from",
+											"value": "{{in3DaysYMD}}"
+										},
+										{
+											"key": "to",
+											"value": "{{in7DaysYMD}}"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Appointments",
+			"item": [
+				{
+					"name": "Patient",
+					"item": [
+						{
+							"name": "Book appointment (success)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('201', ()=> pm.response.code===201);",
+											"const a = pm.response.json().appointment || {}; pm.collectionVariables.set('apptId', a.id || '');"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{patientToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"slot_id\": \"{{slotId}}\",\n  \"chosen_date\": \"{{in5DaysYMD}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/appointments",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"appointments"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Book appointment (missing slot_id) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{patientToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"chosen_date\": \"{{in5DaysYMD}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/appointments",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"appointments"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Book appointment (too soon) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{patientToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"slot_id\": \"{{slotId}}\",\n  \"chosen_date\": \"{{todayYMD}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/appointments",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"appointments"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "My appointments (patient)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{patientToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/appointments/patient/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"appointments",
+										"patient",
+										"me"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Doctor",
+					"item": [
+						{
+							"name": "Update status -> confirmed (success)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"status\": \"confirmed\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/appointments/{{apptId}}/status",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"appointments",
+										"{{apptId}}",
+										"status"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Update status (invalid enum) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"status\": \"not-a-status\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/appointments/{{apptId}}/status",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"appointments",
+										"{{apptId}}",
+										"status"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "My appointments (doctor)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/appointments/doctor/me",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"appointments",
+										"doctor",
+										"me"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Reports",
+			"item": [
+				{
+					"name": "Doctor",
+					"item": [
+						{
+							"name": "Summary (overall)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/reports/appointments",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"reports",
+										"appointments"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Summary (daily)",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('200', ()=> pm.response.code===200);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/reports/appointments?date={{in5DaysYMD}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"reports",
+										"appointments"
+									],
+									"query": [
+										{
+											"key": "date",
+											"value": "{{in5DaysYMD}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Summary (invalid date) -> 400",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"type": "text/javascript",
+										"exec": [
+											"pm.test('400', ()=> pm.response.code===400);"
+										]
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{doctorToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/reports/appointments?date=2025-13-40",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"reports",
+										"appointments"
+									],
+									"query": [
+										{
+											"key": "date",
+											"value": "2025-13-40"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// ตั้งค่าวันเวลาอัตโนมัติทุกครั้ง",
+					"const pad=n=>(''+n).padStart(2,'0');",
+					"const d=new Date();",
+					"const y=d.getFullYear(); const m=pad(d.getMonth()+1); const dd=pad(d.getDate());",
+					"pm.collectionVariables.set('todayYMD', `${y}-${m}-${dd}`);",
+					"const setDay=(offset)=>{const x=new Date(); x.setDate(x.getDate()+offset); return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`};",
+					"pm.collectionVariables.set('tomorrowYMD', setDay(1));",
+					"pm.collectionVariables.set('in3DaysYMD', setDay(3));",
+					"pm.collectionVariables.set('in5DaysYMD', setDay(5));",
+					"pm.collectionVariables.set('in7DaysYMD', setDay(7));"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:4005"
+		},
+		{
+			"key": "doctorEmail",
+			"value": "doctor1@example.com"
+		},
+		{
+			"key": "doctorPassword",
+			"value": "doct1234"
+		},
+		{
+			"key": "patientEmail",
+			"value": "patient1@example.com"
+		},
+		{
+			"key": "patientPassword",
+			"value": "pat1234"
+		},
+		{
+			"key": "adminEmail",
+			"value": "admin@example.com"
+		},
+		{
+			"key": "adminPassword",
+			"value": "admin1234"
+		},
+		{
+			"key": "doctorToken",
+			"value": ""
+		},
+		{
+			"key": "patientToken",
+			"value": ""
+		},
+		{
+			"key": "adminToken",
+			"value": ""
+		},
+		{
+			"key": "doctorId",
+			"value": ""
+		},
+		{
+			"key": "patientId",
+			"value": ""
+		},
+		{
+			"key": "slotId",
+			"value": ""
+		},
+		{
+			"key": "apptId",
+			"value": ""
+		},
+		{
+			"key": "spec1",
+			"value": ""
+		},
+		{
+			"key": "spec2",
+			"value": ""
+		},
+		{
+			"key": "todayYMD",
+			"value": "2025-08-27"
+		},
+		{
+			"key": "tomorrowYMD",
+			"value": "2025-08-28"
+		},
+		{
+			"key": "in3DaysYMD",
+			"value": "2025-08-30"
+		},
+		{
+			"key": "in5DaysYMD",
+			"value": "2025-09-01"
+		},
+		{
+			"key": "in7DaysYMD",
+			"value": "2025-09-03"
+		},
+		{
+			"key": "doctorName",
+			"value": ""
+		}
+	]
+}
