@@ -117,9 +117,12 @@ app.use(
 // login endpoint rate-limit (ต่อ IP)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 นาที
-  max: 6, // อนุญาต 6 ครั้ง/หน้าต่างเวลา
+  max: 6,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req /*, res */) => {
+    return getClientIp(req) || req.ip || "unknown";
+  },
   message: {
     error: {
       code: "RATE_LIMITED",
@@ -505,8 +508,6 @@ export async function setDoctorSpecialties(doctorId, specialtyIds = []) {
   }
 }
 
-// เก็บไว้ให้เรียกใช้ที่อื่นได้ ถ้าอยากใช้แบบเดิม (ไม่ใช่ตัว escalated logic)
-// ใน route /auth/login เราจะใช้ logic แบบ escalated + IP block ด้านล่าง
 export async function loginUser(email, password) {
   const e = (email || "").trim().toLowerCase();
   const [rows] = await pool.query(
@@ -1327,14 +1328,14 @@ app.post(
   "/auth/login",
   loginLimiter,
   asyncHandler(async (req, res) => {
-    // 1) validate
+    // validate
     const parsed = LoginSchema.safeParse(req.body || {});
     if (!parsed.success) return respondValidation(res, parsed.error);
     const { email, password } = parsed.data;
 
     const ip = getClientIp(req);
 
-    // 2) ดึง user มาก่อน
+    // ดึง user
     const [rows] = await pool.query(
       "SELECT id, role, email, full_name, password_hash, failed_login_attempts, lock_count, locked_until FROM users WHERE email = ? LIMIT 1",
       [email]
@@ -1351,7 +1352,7 @@ app.post(
       return invalid();
     }
 
-    // 3) ถ้าบัญชีถูกล็อกอยู่ ให้บอกไปก่อน (ยังไม่ตรวจรหัส)
+    // ถ้าบัญชีถูกล็อกอยู่
     if (user.locked_until) {
       const untilTs = new Date(user.locked_until).getTime();
       if (Date.now() < untilTs) {
@@ -1362,17 +1363,49 @@ app.post(
       }
     }
 
-    // 4) ตรวจรหัสผ่านก่อน แล้วค่อยตัดสิน block
+    // ตรวจรหัสผ่าน
     const ok = verifyPassword(password, user.password_hash);
 
     if (ok) {
-      // ล็อกอินสำเร็จ → reset ทุกอย่าง และปลด IP block ถ้ามี
+      // 1) รีเซ็ตฟิลด์ผู้ใช้ใน DB
       await pool.query(
         "UPDATE users SET failed_login_attempts = 0, lock_count = 0, locked_until = NULL WHERE id = ?",
         [user.id]
       );
-      await unblockIp(ip);
 
+      // 2) ปลด IP block ที่เก็บเอง (unblockIp) — ถ้ามีระบบบล็อก
+      try {
+        await unblockIp(ip);
+      } catch (e) {
+        console.error("unblockIp failed:", e);
+        // ไม่ต้องม้วนแป้ง ถ้า unblock ล้มเหลวก็ยังคงให้ล็อกอินต่อได้
+      }
+
+      // 3) สำคัญ: รีเซ็ต counter ของ rate limiter สำหรับ key เดียวกัน
+      //    รองรับทั้ง API แบบใหม่ (resetKey) หรือ store.resetKey
+      try {
+        const key = loginLimiter.keyGenerator ? loginLimiter.keyGenerator(req) : getClientIp(req);
+        if (typeof loginLimiter.resetKey === "function") {
+          loginLimiter.resetKey(key);
+        } else if (loginLimiter.store && typeof loginLimiter.store.resetKey === "function") {
+          // เช่น ถ้าใช้ redis store หรือ custom store
+          await new Promise((resolve, reject) => {
+            loginLimiter.store.resetKey(key, (err) => {
+              if (err) return reject(err);
+              resolve();
+            });
+          });
+        } else if (loginLimiter.store && typeof loginLimiter.store.reset === "function") {
+          // บางสตอร์มี API ต่างกัน
+          loginLimiter.store.reset(key);
+        } else {
+          console.warn("Rate limiter resetKey not supported by this store; key:", key);
+        }
+      } catch (e) {
+        console.error("Failed to reset rate limiter key:", e);
+      }
+
+      // issue token และตอบ
       const token = issueJwt({ sub: user.id, role: user.role || "patient" }, "2h");
       return res.json({
         token,
@@ -1380,7 +1413,7 @@ app.post(
       });
     }
 
-    // 5) รหัสผิด → ตอนนี้ค่อยเช็คว่า IP โดน block อยู่ไหม
+    // ถ้ารหัสไม่ถูก — เช็ค IP block ของระบบ escalated
     if (await isIpBlocked(ip)) {
       return res
         .status(429)

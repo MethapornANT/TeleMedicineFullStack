@@ -55,3 +55,6 @@ telemedicinedb_MethapornANT.sql
 
 5) ทดสอบได้ด้วย Postman
 telemedicine.postman_collection.json
+
+#เข้าไปดูผลงานทันทีได้ที่
+Link Vercel: https://telemedicine-methapornant.vercel.app/login
