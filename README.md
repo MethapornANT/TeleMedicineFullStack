@@ -55,6 +55,7 @@ telemedicinedb_MethapornANT.sql
 
 5) ทดสอบได้ด้วย Postman
 telemedicine.postman_collection.json
+telemedicine.postman_environment.json  (สำหรับ Environment เบื้องต้น)
 
 6) Test Unit ได้ด้วยคำสั่ง
 npm test
