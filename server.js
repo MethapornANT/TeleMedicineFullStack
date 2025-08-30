@@ -84,16 +84,46 @@ app.use(
     crossOriginEmbedderPolicy: false,
   })
 );
-const allowOrigins = (process.env.ALLOW_ORIGINS || "")
+
+// --------- CORS: flexible but controlled ----------
+const allowedList = (process.env.ALLOW_ORIGINS || "")
   .split(",")
   .map(s => s.trim())
   .filter(Boolean);
 
-app.use(cors({
-  origin: allowOrigins.length ? allowOrigins : "*",
-  credentials: !!allowOrigins.length,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"]
-}));
+// helper: support exact origins and simple suffix patterns like ".vercel.app" or "*.example.com"
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // no Origin (curl/server) -> allow (ถ้าต้องการปิด ให้ return false)
+  if (allowedList.includes(origin)) return true;
+  for (const a of allowedList) {
+    if (!a) continue;
+    // support entries like ".vercel.app" or "*.vercel.app"
+    if (a.startsWith("*.") && origin.endsWith(a.slice(1))) return true;
+    if (a.startsWith(".") && origin.endsWith(a)) return true;
+  }
+  return false;
+}
+
+const corsOptions = {
+  origin: function(origin, callback) {
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true, // ถ้า client ส่ง cookies/credentials ให้ตั้ง true (และอย่าใช้ "*" เป็น origin)
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS","HEAD"],
+  allowedHeaders: ["Content-Type","Authorization","X-Requested-With","X-Access-Token"],
+  optionsSuccessStatus: 204
+};
+
+app.use((req, res, next) => {
+  // debug: ปิดหรือคอมเมนต์ถ้าเบื่อการพิมพ์ log
+  // console.log("[CORS] origin:", req.headers.origin, "allowed:", isAllowedOrigin(req.headers.origin));
+  next();
+});
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
+
 
 // global rate-limit (ทั้งหมด)
 app.use(
@@ -131,11 +161,6 @@ const loginLimiter = rateLimit({
   },
 });
 
-// (debug) ดู IP ที่ระบบเห็น
-// app.use((req, _res, next) => {
-//   console.log("[CLIENT IP]", req.ip, "xff:", req.headers["x-forwarded-for"]);
-//   next();
-// });
 
 // --------------------------- UPLOADS CONFIG ---------------------------
 const __filename = fileURLToPath(import.meta.url);
@@ -144,14 +169,16 @@ const __dirname = path.dirname(__filename);
 const UPLOAD_DIR = path.resolve(__dirname, "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// ก่อน app.use("/uploads", express.static(UPLOAD_DIR));
 app.use("/uploads", (req, res, next) => {
-  // Allow fetch/embed from any origin
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (isAllowedOrigin(origin)) {
+    // echo origin เพื่อให้ทำงานกับ credentials
+    res.setHeader("Access-Control-Allow-Origin", origin || "");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();
 }, express.static(UPLOAD_DIR));
-
 
 // จำกัดไฟล์ภาพเท่านั้น
 const fileFilter = (_req, file, cb) => {
